@@ -17,7 +17,7 @@ Skindicate: a `Conn` flows through guards to a handler; operations return
 
 ```sh
 facet install                              # fetch the cuts in diamond.cut into cuts/
-./compile_views.sh                         # re-run after editing anything in views/
+./compile_views.sh                         # re-run after editing anything in views/ (the app refuses to start if you forget)
 diamond app.di                             # prints its address; creates data/stash.db on first run
 ```
 
