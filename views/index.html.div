@@ -15,7 +15,7 @@
   <section class="list">
     <% if page["q"] != "" || page["tag"] != "" %>
     <p class="filter">
-      <%= page["total"] %> result<% if page["total"] != 1 %>s<% end %><% if page["q"] != "" %> for “<%= page["q"] %>”<% end %><% if page["tag"] != "" %> tagged <strong><%= page["tag"] %></strong><% end %>
+      <%= page["total"] %> result<%= page["total"] == 1 ? "" : "s" %><% if page["q"] != "" %> for “<%= page["q"] %>”<% end %><% if page["tag"] != "" %> tagged <strong><%= page["tag"] %></strong><% end %>
       · <a href="/">clear</a>
     </p>
     <% end %>

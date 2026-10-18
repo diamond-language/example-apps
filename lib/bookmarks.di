@@ -101,7 +101,7 @@ class Bookmarks
     counts = {}
     repo.all(schemas.bookmarks().query().where({"user_id": user.id()})).each() do |bookmark|
       Bookmarks.tag_list(bookmark.tags()).each() do |tag|
-        counts[tag] = if counts[tag] == nil then 1 else counts[tag] + 1 end
+        counts[tag] = (counts[tag] || 0) + 1
       end
     end
     pairs = counts.keys().map() do |tag| [tag, counts[tag]] end

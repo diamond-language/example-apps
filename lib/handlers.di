@@ -39,9 +39,7 @@ class BookmarkPages
   end
 
   def self.new_form(conn)
-    url = conn.params()["url"]
-    title = conn.params()["title"]
-    prefill = {"url": if url == nil then "" else url end, "title": if title == nil then "" else title end, "note": "", "tags": ""}
+    prefill = {"url": conn.params()["url"] || "", "title": conn.params()["title"] || "", "note": "", "tags": ""}
     Pages.render(conn, "Add a bookmark", bookmark_form_html("/bookmarks", prefill, [], conn.csrf_token(), "Add"))
   end
 
@@ -58,7 +56,7 @@ class BookmarkPages
   def self.edit_form(conn)
     bookmark = Bookmarks.find(conn.repo(), conn.schemas(), conn.user(), conn.route_params()["id"])
     if bookmark == nil then return Web.not_found(conn.path()) end
-    values = {"url": bookmark.url(), "title": bookmark.title(), "note": if bookmark.note() == nil then "" else bookmark.note() end, "tags": Bookmarks.tag_list(bookmark.tags()).join(" ")}
+    values = {"url": bookmark.url(), "title": bookmark.title(), "note": bookmark.note() || "", "tags": Bookmarks.tag_list(bookmark.tags()).join(" ")}
     Pages.render(conn, "Edit bookmark", bookmark_form_html("/bookmarks/#{bookmark.id()}", values, [], conn.csrf_token(), "Save"))
   end
 
