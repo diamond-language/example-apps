@@ -23,6 +23,9 @@ require "./lib/schema"
 require "./lib/bookmarks"
 require "./lib/handlers"
 
+# Stop with the fix named, rather than serve an old page, if a template changed since compile_views.sh ran.
+Div.check_fresh("views", "./compile_views.sh")
+
 # Each gremlin worker is an isolated VM, so a worker builds its own database
 # handle, repo and router on its first request and keeps them in its context.
 def build_state()
