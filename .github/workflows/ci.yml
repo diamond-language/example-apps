@@ -14,11 +14,17 @@ jobs:
   stash:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Diamond is C23, which needs the compiler in Ubuntu 26.04.
+    container:
+      image: ubuntu:26.04
+      options: --init
     steps:
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc make libssl-dev libsqlite3-dev libpq-dev zlib1g-dev libmariadb-dev libcrypt-dev
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y gcc make git ca-certificates diffutils findutils \
+            libssl-dev libsqlite3-dev libpq-dev zlib1g-dev libmariadb-dev libcrypt-dev \
+            sqlite3 python3 curl gzip openssl
       - uses: actions/checkout@v7
         with:
           path: example-apps
@@ -33,10 +39,11 @@ jobs:
       - name: Install cuts and compile views
         working-directory: example-apps/stash
         run: |
-          echo "$GITHUB_WORKSPACE/diamond/build" >> "$GITHUB_PATH"
           export PATH="$GITHUB_WORKSPACE/diamond/build:$PATH"
           facet install
           ./compile_views.sh
       - name: Run the tests
         working-directory: example-apps/stash
-        run: python3 test/app_test.py
+        run: |
+          export PATH="$GITHUB_WORKSPACE/diamond/build:$PATH"
+          python3 test/app_test.py
