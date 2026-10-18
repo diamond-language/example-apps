@@ -1,0 +1,6 @@
+cuts/
+data/
+views/.cache/
+*.dic
+dist/
+__pycache__/

@@ -1,0 +1,56 @@
+<%# locals: page, tags, csrf_token %>
+<div class="layout">
+  <aside class="tags">
+    <h2>Tags</h2>
+    <% if tags.length() == 0 %>
+    <p class="muted">No tags yet.</p>
+    <% else %>
+    <ul>
+      <% tags.each() do |pair| %>
+      <li><a href="/?tag=<%= url_encode(pair[0]) %>"<% if pair[0] == page["tag"] %> class="active"<% end %>><%= pair[0] %></a> <span class="count"><%= pair[1] %></span></li>
+      <% end %>
+    </ul>
+    <% end %>
+  </aside>
+  <section class="list">
+    <% if page["q"] != "" || page["tag"] != "" %>
+    <p class="filter">
+      <%= page["total"] %> result<% if page["total"] != 1 %>s<% end %><% if page["q"] != "" %> for “<%= page["q"] %>”<% end %><% if page["tag"] != "" %> tagged <strong><%= page["tag"] %></strong><% end %>
+      · <a href="/">clear</a>
+    </p>
+    <% end %>
+    <% if page["items"].length() == 0 %>
+    <div class="empty">
+      <% if page["total"] == 0 && page["q"] == "" && page["tag"] == "" %>
+      <p>Nothing saved yet. <a href="/bookmarks/new">Add your first bookmark</a>.</p>
+      <% else %>
+      <p>No bookmarks match.</p>
+      <% end %>
+    </div>
+    <% end %>
+    <% page["items"].each() do |bookmark| %>
+    <article class="bookmark">
+      <h3><a href="<%= bookmark.url() %>" rel="noopener noreferrer" target="_blank"><%= bookmark.title() %></a></h3>
+      <p class="url"><%= bookmark.url() %></p>
+      <% if bookmark.note() != nil %><p class="note"><%= bookmark.note() %></p><% end %>
+      <div class="meta">
+        <% Bookmarks.tag_list(bookmark.tags()).each() do |tag| %><a class="tag" href="/?tag=<%= url_encode(tag) %>"><%= tag %></a> <% end %>
+        <span class="actions">
+          <a href="/bookmarks/<%= bookmark.id() %>/edit">Edit</a>
+          <form method="POST" action="/bookmarks/<%= bookmark.id() %>/delete" class="inline" onsubmit="return confirm('Delete this bookmark?')">
+            <%== Div.hidden_field_tag("csrf_token", csrf_token) %>
+            <button type="submit" class="btn btn-link danger">Delete</button>
+          </form>
+        </span>
+      </div>
+    </article>
+    <% end %>
+    <% if page["pages"] > 1 %>
+    <nav class="pager">
+      <% if page["page"] > 1 %><a href="<%== list_href(page["q"], page["tag"], page["page"] - 1) %>">&larr; Newer</a><% end %>
+      <span>Page <%= page["page"] %> of <%= page["pages"] %></span>
+      <% if page["page"] < page["pages"] %><a href="<%== list_href(page["q"], page["tag"], page["page"] + 1) %>">Older &rarr;</a><% end %>
+    </nav>
+    <% end %>
+  </section>
+</div>

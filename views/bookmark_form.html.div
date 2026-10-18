@@ -1,0 +1,16 @@
+<%# locals: action, values, errors, csrf_token, submit_label %>
+<section class="card">
+  <h1><% if submit_label == "Add" %>Add a bookmark<% else %>Edit bookmark<% end %></h1>
+  <%== errors_html(errors) %>
+  <form method="POST" action="<%= action %>">
+    <%== Div.hidden_field_tag("csrf_token", csrf_token) %>
+    <label>URL <input type="url" name="url" value="<%= values["url"] %>" placeholder="https://" required autofocus></label>
+    <label>Title <input type="text" name="title" value="<%= values["title"] %>" placeholder="Defaults to the URL"></label>
+    <label>Note <textarea name="note" rows="4"><%= values["note"] %></textarea></label>
+    <label>Tags <input type="text" name="tags" value="<%= values["tags"] %>" placeholder="ruby web-dev (space or comma separated)"></label>
+    <div class="actions">
+      <button type="submit" class="btn btn-primary"><%= submit_label %></button>
+      <a href="/" class="btn btn-link">Cancel</a>
+    </div>
+  </form>
+</section>

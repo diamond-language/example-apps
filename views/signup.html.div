@@ -1,0 +1,12 @@
+<%# locals: errors, email, username %>
+<section class="card narrow">
+  <h1>Sign up</h1>
+  <%== errors_html(errors) %>
+  <form method="POST" action="/signup">
+    <label>Email <input type="email" name="email" value="<%= email %>" required autofocus></label>
+    <label>Username <input type="text" name="username" value="<%= username %>" required></label>
+    <label>Password <input type="password" name="password" minlength="8" required></label>
+    <button type="submit" class="btn btn-primary">Create account</button>
+  </form>
+  <p class="muted">Already have one? <a href="/login">Sign in</a></p>
+</section>
