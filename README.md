@@ -18,8 +18,7 @@ Built on Gremlin (server), Div (views) and Mjolnir (data), with the same shape a
 ```sh
 tools/setup_cuts.sh                        # install the local cuts Stash loads
 ./compile_views.sh                         # re-run after editing anything in views/
-sqlite3 data/stash.db < db/schema.sql
-../diamond/build/diamond app.di            # http://127.0.0.1:18300
+../diamond/build/diamond app.di            # prints its address; creates data/stash.db on first run
 ```
 
 `STASH_DB` (default `data/stash.db`), `PORT` (default 18300), `STASH_THREADS` (default 1) and

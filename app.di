@@ -74,4 +74,26 @@ def handler(request, context)
   Auth.finish(conn, response)
 end
 
-gremlin_serve((ENV["PORT"] || "18300").to_i(), handler, (ENV["STASH_THREADS"] || "1").to_i())
+# Opens the database before serving (workers open it lazily, per request), so a
+# fresh checkout starts with the schema in place instead of failing on the first request.
+def prepare_database(path)
+  dir = File.dirname(path)
+  if !File.directory?(dir) then Dir.mkdir(dir) end
+  db = SQLite3.open(path)
+  if db.query("SELECT name FROM sqlite_master WHERE name = 'users'").length() == 0
+    File.read("db/schema.sql").split(";").each() do |statement|
+      if statement.split("\n").any?() do |line| line.strip() != "" && !line.strip().start_with?("--") end
+        db.execute(statement)
+      end
+    end
+    puts("created #{path} from db/schema.sql")
+  end
+  db.close()
+end
+
+db_path = ENV["STASH_DB"] || "data/stash.db"
+port = (ENV["PORT"] || "18300").to_i()
+threads = (ENV["STASH_THREADS"] || "1").to_i()
+prepare_database(db_path)
+puts("Stash listening on http://127.0.0.1:#{port} (database #{db_path}, #{threads} worker#{threads == 1 ? "" : "s"}); Ctrl+C to stop")
+gremlin_serve(port, handler, threads)
