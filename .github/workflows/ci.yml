@@ -1,0 +1,42 @@
+name: test
+
+on:
+  # Changes reach main through a pull request rebased onto it, so a run on the merge
+  # commit would repeat the run on that exact tree. workflow_dispatch checks main by hand.
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make libssl-dev libsqlite3-dev libpq-dev zlib1g-dev libmariadb-dev libcrypt-dev
+      - uses: actions/checkout@v7
+        with:
+          path: example-apps
+          fetch-depth: 1
+      - uses: actions/checkout@v7
+        with:
+          repository: diamond-language/diamond
+          path: diamond
+          fetch-depth: 1
+      - name: Build Diamond and facet
+        run: make -C diamond release facet
+      - name: Install cuts and compile views
+        working-directory: example-apps/stash
+        run: |
+          echo "$GITHUB_WORKSPACE/diamond/build" >> "$GITHUB_PATH"
+          export PATH="$GITHUB_WORKSPACE/diamond/build:$PATH"
+          facet install
+          ./compile_views.sh
+      - name: Run the tests
+        working-directory: example-apps/stash
+        run: python3 test/app_test.py

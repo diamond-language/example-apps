@@ -1,0 +1,9 @@
+{
+  "name": "stash",
+  "dependencies": {
+    "gremlin": {"registry": "https://cuts.dilang.tech", "version": "^0.4.1"},
+    "div": {"registry": "https://cuts.dilang.tech", "version": "^0.2.3"},
+    "mjolnir": {"registry": "https://cuts.dilang.tech", "version": "^0.2.0"},
+    "cookies": {"registry": "https://cuts.dilang.tech", "version": "^0.1.2"}
+  }
+}

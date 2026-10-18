@@ -2,7 +2,7 @@
 import http.client, os, re, signal, sqlite3, subprocess, sys, tempfile, time, urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__)) + "/.."
-DIAMOND = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else HERE + "/../diamond/build/diamond")
+DIAMOND = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("DIAMOND_BIN", "diamond")
 
 
 class Client:

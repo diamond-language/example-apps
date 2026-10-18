@@ -2,7 +2,7 @@
 
 A private bookmark shelf written in Diamond: save a link, tag it, search it.
 Built on Gremlin (server), Div (views) and Mjolnir (data), with the same shape as
-`../SkindicateV3`: a `Conn` flows through guards to a handler; operations return
+Skindicate: a `Conn` flows through guards to a handler; operations return
 `Ok`/`Err`; views are pure functions of data.
 
 ## Features
@@ -16,9 +16,9 @@ Built on Gremlin (server), Div (views) and Mjolnir (data), with the same shape a
 ## Run
 
 ```sh
-tools/setup_cuts.sh                        # install the local cuts Stash loads
+facet install                              # fetch the cuts in diamond.cut into cuts/
 ./compile_views.sh                         # re-run after editing anything in views/
-../diamond/build/diamond app.di            # prints its address; creates data/stash.db on first run
+diamond app.di                             # prints its address; creates data/stash.db on first run
 ```
 
 `STASH_DB` (default `data/stash.db`), `PORT` (default 18300), `STASH_THREADS` (default 1) and
@@ -26,7 +26,7 @@ tools/setup_cuts.sh                        # install the local cuts Stash loads
 
 ## Test
 
-`python3 test/app_test.py [path/to/diamond]` starts a throwaway server and checks signup, login,
+`python3 test/app_test.py [path/to/diamond]` (or set `DIAMOND_BIN`) starts a throwaway server and checks signup, login,
 CSRF, CRUD, tags, search, paging and that one user cannot touch another's bookmarks.
 
 ## Notes
@@ -34,4 +34,4 @@ CSRF, CRUD, tags, search, paging and that one user cannot touch another's bookma
 - Tags live in one column as `" a b c "` (a space each side), so a tag filter is `LIKE '% tag %'`.
   That is exact and simple at personal scale; a join table is the move if tags need renaming or stats.
 - A multi-worker server (`STASH_THREADS`) runs no top-level statements in a worker, so shared values are
-  functions (`lib/util.di`), as in SkindicateV3.
+  functions (`lib/util.di`), as in other multi-worker Diamond servers.
