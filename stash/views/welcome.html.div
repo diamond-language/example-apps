@@ -1,0 +1,6 @@
+<%# locals: %>
+<section class="hero">
+  <h1>Keep the links worth keeping.</h1>
+  <p>Stash is a private bookmark shelf: save a link, tag it, find it again.</p>
+  <p><a href="/signup" class="btn btn-primary">Create an account</a> <a href="/login" class="btn btn-link">Sign in</a></p>
+</section>

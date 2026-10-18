@@ -1,0 +1,38 @@
+<%# locals: title, content, user, csrf_token, flash %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><% if title == "Stash" %>Stash<% else %><%= title %> - Stash<% end %></title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <header class="bar">
+    <a href="/" class="logo">Stash</a>
+    <% if user != nil %>
+    <form method="GET" action="/" class="search" role="search">
+      <input type="search" name="q" placeholder="Search bookmarks" aria-label="Search bookmarks">
+    </form>
+    <nav class="bar-actions">
+      <a href="/bookmarks/new" class="btn btn-primary">+ Add</a>
+      <span class="who">@<%= user.username() %></span>
+      <form method="POST" action="/logout" class="inline">
+        <%== Div.hidden_field_tag("csrf_token", csrf_token) %>
+        <button type="submit" class="btn btn-link">Sign out</button>
+      </form>
+    </nav>
+    <% else %>
+    <nav class="bar-actions">
+      <a href="/login" class="btn btn-link">Sign in</a>
+      <a href="/signup" class="btn btn-primary">Sign up</a>
+    </nav>
+    <% end %>
+  </header>
+  <main class="page">
+    <% if flash["notice"] != nil %><div class="alert alert-notice"><%= flash["notice"] %></div><% end %>
+    <% if flash["alert"] != nil %><div class="alert alert-error"><%= flash["alert"] %></div><% end %>
+    <%== content %>
+  </main>
+</body>
+</html>
