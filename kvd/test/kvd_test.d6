@@ -65,15 +65,9 @@ def run_tests()
     diamond = ENV["DIAMOND_BIN"] == nil ? "diamond" : ENV["DIAMOND_BIN"]
     server = Process.spawn(["env", "PORT=0", "DATA=#{File.join(scratch, "served.json")}", diamond, "main.d6"])
     begin
-      # Process::Stream reads bytes, not lines: collect up to the banner's newline.
-      banner = ""
-      until banner.include?("\n")
-        IO.poll([server.stdout()], [], 5000)
-        chunk = server.stdout().read(256)
-        break if chunk == nil
-        banner += chunk
-      end
-      Minitest.assert(banner.start_with?("kvd listening on 127.0.0.1:"), "banner: #{banner}")
+      banner = server.stdout().gets()
+      Minitest.assert(banner != nil && banner.start_with?("kvd listening on 127.0.0.1:"),
+        "banner: #{banner.inspect()}")
       port = banner.split(":")[1].split(" ")[0]
 
       def client(args: Array, stdin: String = "")

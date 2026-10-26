@@ -49,19 +49,12 @@ module Tasks
   # Writes the whole list to a temporary file and renames it over the old
   # one, so an interrupted save never leaves half a file behind.
   def self.save(path: String, list: Hash)
-    Tasks.make_directories(File.dirname(path))
+    Dir.mkdir_p(File.dirname(path))
     temporary = "#{path}.tmp"
     file = File.open(temporary, "w")
     file.write(JSON.stringify(list, {"indent": 2}) + "\n")
     file.close()
     File.rename(temporary, path)
-  end
-
-  # Dir.mkdir creates one level; walk up to the first directory that exists.
-  def self.make_directories(path: String)
-    return if path == "" || File.directory?(path)
-    Tasks.make_directories(File.dirname(path))
-    Dir.mkdir(path)
   end
 
   # --- commands --------------------------------------------------------
@@ -132,16 +125,14 @@ module Tasks
   # Runs one command and returns the exit status. env is ENV, passed in so
   # the tests can point the list at a temporary file.
   def self.main(args: Array, env: Hash = ENV) -> Int
-    begin
-      Tasks.run(args, env)
-    rescue error: UsageError
-      warn("tasks: #{error.message()}")
-      warn("run 'tasks --help' for usage")
-      64
-    rescue error: StandardError
-      warn("tasks: #{error.message()}")
-      1
-    end
+    Tasks.run(args, env)
+  rescue error: UsageError
+    warn("tasks: #{error.message()}")
+    warn("run 'tasks --help' for usage")
+    64
+  rescue error: StandardError
+    warn("tasks: #{error.message()}")
+    1
   end
 
   def self.run(args: Array, env: Hash) -> Int
