@@ -1,0 +1,110 @@
+# Run with `diamond test/kvd_test.d6`, or `bash test.sh` for every test file.
+require_cut "minitest"
+require "../lib/kvd"
+
+def run_tests()
+  scratch = Process.run(["mktemp", "-d"]).stdout().strip()
+
+  def test_ping() = Minitest.assert_equal("+PONG", Kvd.respond(Store.new(), "PING\r"))
+
+  def test_commands_ignore_case() = Minitest.assert_equal("+PONG", Kvd.respond(Store.new(), "ping"))
+
+  def test_set_keeps_spaces_in_the_value()
+    store = Store.new()
+    Minitest.assert_equal("+OK", Kvd.respond(store, "SET motto  keep  it simple"))
+    Minitest.assert_equal("$keep  it simple", Kvd.respond(store, "GET motto"))
+  end
+
+  def test_missing_keys()
+    store = Store.new()
+    Minitest.assert_equal("_", Kvd.respond(store, "GET nothing"))
+    Minitest.assert_equal(":0", Kvd.respond(store, "DEL nothing"))
+  end
+
+  def test_incr()
+    store = Store.new()
+    Minitest.assert_equal(":1", Kvd.respond(store, "INCR hits"))
+    Minitest.assert_equal(":-4", Kvd.respond(store, "INCR hits -5"))
+    Kvd.respond(store, "SET name ada")
+    Minitest.assert_equal("-ERR value is not an integer", Kvd.respond(store, "INCR name"))
+    Minitest.assert_equal("-ERR INCR's amount must be an integer", Kvd.respond(store, "INCR hits lots"))
+  end
+
+  def test_keys_are_sorted_and_filtered()
+    store = Store.new()
+    ["b", "ab", "aa"].each() do |key| Kvd.respond(store, "SET #{key} 1") end
+    Minitest.assert_equal("*3\n$aa\n$ab\n$b", Kvd.respond(store, "KEYS"))
+    Minitest.assert_equal("*2\n$aa\n$ab", Kvd.respond(store, "KEYS a"))
+  end
+
+  def test_errors()
+    store = Store.new()
+    Minitest.assert_equal("-ERR usage: GET key", Kvd.respond(store, "GET"))
+    Minitest.assert_equal("-ERR unknown command FLY", Kvd.respond(store, "fly away"))
+    Minitest.assert_equal("-ERR empty request", Kvd.respond(store, ""))
+  end
+
+  def test_the_store_survives_a_restart()
+    path = File.join(scratch, "data.json")
+    store = Store.new(path)
+    store.set("greeting", "hello")
+    store.increment("hits", 2)
+    store.delete("greeting")
+    Minitest.assert_equal({"hits": "2"}, JSON.parse(File.read(path)))
+    Minitest.assert_equal("2", Store.new(path).get("hits"))
+  end
+
+  def test_take_lines_keeps_the_unfinished_line()
+    [lines, rest] = Kvd.take_lines("one\ntwo\nthr")
+    Minitest.assert_equal(["one", "two"], lines)
+    Minitest.assert_equal("thr", rest)
+  end
+
+  # Starts the real server on a free port and talks to it with the client.
+  def test_server_and_client()
+    diamond = ENV["DIAMOND_BIN"] == nil ? "diamond" : ENV["DIAMOND_BIN"]
+    server = Process.spawn(["env", "PORT=0", "DATA=#{File.join(scratch, "served.json")}", diamond, "main.d6"])
+    begin
+      # Process::Stream reads bytes, not lines: collect up to the banner's newline.
+      banner = ""
+      until banner.include?("\n")
+        IO.poll([server.stdout()], [], 5000)
+        chunk = server.stdout().read(256)
+        break if chunk == nil
+        banner += chunk
+      end
+      Minitest.assert(banner.start_with?("kvd listening on 127.0.0.1:"), "banner: #{banner}")
+      port = banner.split(":")[1].split(" ")[0]
+
+      def client(args: Array, stdin: String = "")
+        Process.run(["env", "PORT=#{port}", diamond, "client.d6"] + args, {"stdin": stdin})
+      end
+      Minitest.assert_equal("OK\n", client(["SET", "greeting", "hello", "there"]).stdout())
+      Minitest.assert_equal("hello there\n", client(["GET", "greeting"]).stdout())
+      piped = client([], "INCR hits\nINCR hits\nKEYS\nGET nothing\n")
+      Minitest.assert_equal("1\n2\ngreeting\nhits\n(nil)\n", piped.stdout())
+      failed = client(["INCR", "greeting"])
+      Minitest.assert_equal(1, failed.exit_code())
+      Minitest.assert_equal("ERR value is not an integer\n", failed.stderr())
+    ensure
+      server.terminate()
+      server.wait()
+    end
+  end
+
+  suite = Minitest.new()
+  suite.test("PING answers +PONG", test_ping)
+  suite.test("commands ignore case", test_commands_ignore_case)
+  suite.test("SET keeps spaces inside the value", test_set_keeps_spaces_in_the_value)
+  suite.test("missing keys read as _ and delete as :0", test_missing_keys)
+  suite.test("INCR adds to integers and refuses other values", test_incr)
+  suite.test("KEYS sorts and filters by prefix", test_keys_are_sorted_and_filtered)
+  suite.test("bad requests get -ERR", test_errors)
+  suite.test("a file-backed store survives a restart", test_the_store_survives_a_restart)
+  suite.test("take_lines keeps the unfinished line", test_take_lines_keeps_the_unfinished_line)
+  suite.test("the server and client talk over TCP", test_server_and_client)
+  passed = suite.run()
+  Process.run(["rm", "-rf", scratch])
+  exit(passed ? 0 : 1)
+end
+run_tests()

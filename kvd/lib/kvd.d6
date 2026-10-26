@@ -1,0 +1,212 @@
+# kvd: a small key-value server with a line protocol.
+#
+# Each request is one line, a command and its arguments separated by
+# spaces; SET's value is the rest of the line, spaces and all. Each reply
+# starts with a type character:
+#
+#   +OK         success           :42      an integer
+#   $text       a value           _        no such key
+#   *2          a count, then that many `$key` lines (KEYS)
+#   -ERR why    an error; the connection stays open
+#
+# The data lives in a Store. With a file, every change is written through
+# to it, so a restarted server picks up where it left off.
+
+# The keys and values, optionally saved to a JSON file after each change.
+class Store
+  def initialize(path: String | Nil = nil)
+    @path = path
+    @data = {}
+    if path != nil && File.exist?(path)
+      loaded = JSON.parse(File.read(path))
+      raise RuntimeError.new("#{path} does not hold a JSON object") unless loaded.is_a?(Hash)
+      @data = loaded
+    end
+  end
+
+  def get(key: String) -> String | Nil = @data[key]
+
+  def set(key: String, value: String)
+    @data[key] = value
+    self.save()
+  end
+
+  # Returns whether the key existed.
+  def delete(key: String) -> Bool
+    return false unless @data.include_key?(key)
+    @data.delete(key)
+    self.save()
+    true
+  end
+
+  # Adds by to an integer value (a missing key counts as 0) and returns the sum.
+  def increment(key: String, by: Int) -> Int
+    current = @data[key] == nil ? "0" : @data[key]
+    raise ArgumentError.new("value is not an integer") unless Regexp.new("^-?[0-9]+$").match?(current)
+    total = current.to_i() + by
+    @data[key] = total.to_s()
+    self.save()
+    total
+  end
+
+  def keys(prefix: String) -> Array
+    @data.keys().select() do |key| key.start_with?(prefix) end.sort()
+  end
+
+  def size() -> Int = @data.length()
+
+  # Write the new file beside the old one and rename it into place, so a
+  # crash mid-save leaves the previous contents rather than half a file.
+  def save()
+    return if @path == nil
+    temporary = "#{@path}.tmp"
+    file = File.open(temporary, "w")
+    file.write(JSON.stringify(@data))
+    file.close()
+    File.rename(temporary, @path)
+  end
+end
+
+class Kvd
+  # The longest request line accepted; a client that sends more without a
+  # newline is disconnected, so it can't make the server buffer forever.
+  MAX_LINE = 65536
+
+  # The reply to one request line.
+  def self.respond(store: Store, line: String) -> String
+    line = line.chomp()
+    space = line.index(" ")
+    command = (space == nil ? line : line[0, space]).upcase()
+    rest = space == nil ? "" : line.slice(space + 1, line.length() - space - 1)
+    args = rest.split(" ").reject() do |word| word == "" end
+
+    case command
+    when "PING" then "+PONG"
+    when "GET"
+      return "-ERR usage: GET key" unless args.length() == 1
+      value = store.get(args[0])
+      value == nil ? "_" : "$#{value}"
+    when "SET"
+      return "-ERR usage: SET key value" if args.length() < 2
+      # The value is everything after the key, so it may contain spaces.
+      after_key = rest.lstrip()
+      value = after_key.slice(args[0].length(), after_key.length() - args[0].length()).lstrip()
+      store.set(args[0], value)
+      "+OK"
+    when "DEL"
+      return "-ERR usage: DEL key" unless args.length() == 1
+      ":#{store.delete(args[0]) ? 1 : 0}"
+    when "INCR"
+      return "-ERR usage: INCR key [by]" unless args.length() == 1 || args.length() == 2
+      if args.length() == 2 && !Regexp.new("^-?[0-9]+$").match?(args[1])
+        return "-ERR INCR's amount must be an integer"
+      end
+      by = args.length() == 2 ? args[1].to_i() : 1
+      begin
+        ":#{store.increment(args[0], by)}"
+      rescue error: ArgumentError
+        "-ERR #{error.message()}"
+      end
+    when "KEYS"
+      return "-ERR usage: KEYS [prefix]" if args.length() > 1
+      keys = store.keys(args.length() == 1 ? args[0] : "")
+      (["*#{keys.length()}"] + keys.map() do |key| "$#{key}" end).join("\n")
+    when "QUIT" then "+BYE"
+    when "" then "-ERR empty request"
+    else
+      "-ERR unknown command #{command}"
+    end
+  end
+
+  # Splits buffer into complete lines. Returns [lines, rest], where rest
+  # is the unfinished line still waiting for its newline.
+  def self.take_lines(buffer: String) -> Array
+    lines = []
+    newline = buffer.index("\n")
+    while newline != nil
+      lines.push(buffer[0, newline])
+      buffer = buffer.slice(newline + 1, buffer.length() - newline - 1)
+      newline = buffer.index("\n")
+    end
+    [lines, buffer]
+  end
+
+  # Writes all of text to a non-blocking socket, which may take several
+  # writes when the send buffer is full.
+  def self.write_all(connection, text: String)
+    while text.length() > 0
+      written = connection.write(text)
+      text = text.slice(written, text.length() - written)
+      if text.length() > 0
+        IO.poll([], [connection], -1)
+      end
+    end
+  end
+
+  # Serves every client from one thread. IO.poll waits until the listener
+  # has a client to accept or a connection has bytes to read, so one slow
+  # client never holds up the others.
+  def self.serve(listener, store: Store)
+    connections = []
+    buffers = []
+    while true
+      readable = IO.poll([listener] + connections, [], -1)["readable"]
+
+      # Walk backwards so removing a closed connection keeps the indexes
+      # of the ones not yet visited.
+      index = connections.length() - 1
+      while index >= 0
+        if readable[index + 1]
+          connection = connections[index]
+          data = nil
+          open = true
+          begin
+            data = connection.read(4096)
+            open = data != nil
+          rescue error: WouldBlockError
+            data = ""
+          rescue error: IOError
+            open = false
+          end
+
+          if open
+            [lines, rest] = Kvd.take_lines(buffers[index] + data)
+            buffers[index] = rest
+            lines.each() do |line|
+              break unless open
+              reply = Kvd.respond(store, line)
+              begin
+                Kvd.write_all(connection, "#{reply}\n")
+              rescue error: IOError
+                open = false
+              end
+              open = false if reply == "+BYE"
+            end
+            if open && rest.length() > MAX_LINE
+              begin
+                Kvd.write_all(connection, "-ERR line too long\n")
+              rescue error: IOError
+              end
+              open = false
+            end
+          end
+
+          unless open
+            connection.close()
+            connections.delete_at(index)
+            buffers.delete_at(index)
+          end
+        end
+        index -= 1
+      end
+
+      if readable[0]
+        connection = listener.accept()
+        unless connection == nil
+          connections.push(connection)
+          buffers.push("")
+        end
+      end
+    end
+  end
+end

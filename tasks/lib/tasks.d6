@@ -1,0 +1,185 @@
+# tasks: a to-do list kept in a JSON file.
+#
+# The list is a Hash: {"next_id": Int, "tasks": [task, ...]}, each task
+# {"id": Int, "text": String, "done": Bool, "added": "YYYY-MM-DD"}. Ids
+# are never reused, so `tasks done 3` always means the task once shown as 3.
+module Tasks
+  USAGE = [
+    "usage: tasks [--file PATH] COMMAND [ARGS]",
+    "",
+    "commands:",
+    "  add TEXT...       add a task",
+    "  list [--all]      open tasks; --all includes finished ones",
+    "  done ID...        mark tasks finished",
+    "  undo ID...        mark finished tasks open again",
+    "  edit ID TEXT...   replace a task's text",
+    "  rm ID...          delete tasks",
+    "  clear             delete every finished task",
+    "",
+    "The list lives in --file, else $TASKS_FILE, else",
+    "$XDG_DATA_HOME/tasks/tasks.json (~/.local/share/tasks/tasks.json)."
+  ].join("\n")
+
+  # A mistake in how the command was called: main prints the message and
+  # exits 64 (EX_USAGE). Any other failure exits 1.
+  class UsageError < StandardError
+  end
+
+  def self.empty_list() -> Hash = {"next_id": 1, "tasks": []}
+
+  # --- storage ---------------------------------------------------------
+
+  def self.default_path(env: Hash) -> String
+    return env["TASKS_FILE"] unless env["TASKS_FILE"] == nil
+    data_home = env["XDG_DATA_HOME"]
+    if data_home == nil || data_home == ""
+      raise UsageError.new("set HOME, TASKS_FILE or --file") if env["HOME"] == nil
+      data_home = File.join(env["HOME"], ".local/share")
+    end
+    File.join(data_home, "tasks/tasks.json")
+  end
+
+  def self.load(path: String) -> Hash
+    return Tasks.empty_list() unless File.exist?(path)
+    list = JSON.parse(File.read(path))
+    raise RuntimeError.new("#{path} is not a tasks file") unless list.is_a?(Hash) && list["tasks"].is_a?(Array)
+    list
+  end
+
+  # Writes the whole list to a temporary file and renames it over the old
+  # one, so an interrupted save never leaves half a file behind.
+  def self.save(path: String, list: Hash)
+    Tasks.make_directories(File.dirname(path))
+    temporary = "#{path}.tmp"
+    file = File.open(temporary, "w")
+    file.write(JSON.stringify(list, {"indent": 2}) + "\n")
+    file.close()
+    File.rename(temporary, path)
+  end
+
+  # Dir.mkdir creates one level; walk up to the first directory that exists.
+  def self.make_directories(path: String)
+    return if path == "" || File.directory?(path)
+    Tasks.make_directories(File.dirname(path))
+    Dir.mkdir(path)
+  end
+
+  # --- commands --------------------------------------------------------
+
+  def self.add(list: Hash, words: Array, today: String) -> String
+    text = words.join(" ").strip()
+    raise UsageError.new("add needs the task's text") if text == ""
+    id = list["next_id"]
+    list["tasks"].push({"id": id, "text": text, "done": false, "added": today})
+    list["next_id"] = id + 1
+    "added #{id}: #{text}"
+  end
+
+  def self.list_lines(list: Hash, all: Bool) -> Array
+    shown = list["tasks"].select() do |task| all || !task["done"] end
+    return [all ? "no tasks" : "nothing to do"] if shown.empty?()
+    width = shown.map() do |task| task["id"].to_s().length() end.max()
+    shown.map() do |task|
+      mark = task["done"] ? "[x]" : "[ ]"
+      "#{task["id"].to_s().rjust(width)} #{mark} #{task["text"]}  (#{task["added"]})"
+    end
+  end
+
+  def self.set_done(list: Hash, ids: Array, done: Bool) -> Array
+    Tasks.find_all(list, ids).map() do |task|
+      task["done"] = done
+      "#{done ? "done" : "reopened"} #{task["id"]}: #{task["text"]}"
+    end
+  end
+
+  def self.edit(list: Hash, args: Array) -> String
+    raise UsageError.new("edit needs an id and the new text") if args.length() < 2
+    task = Tasks.find_all(list, [args[0]])[0]
+    text = args.slice(1, args.length() - 1).join(" ").strip()
+    raise UsageError.new("edit needs the new text") if text == ""
+    task["text"] = text
+    "edited #{task["id"]}: #{text}"
+  end
+
+  def self.remove(list: Hash, ids: Array) -> Array
+    doomed = Tasks.find_all(list, ids)
+    list["tasks"] = list["tasks"].reject() do |task| doomed.include?(task) end
+    doomed.map() do |task| "removed #{task["id"]}: #{task["text"]}" end
+  end
+
+  def self.clear(list: Hash) -> String
+    before = list["tasks"].length()
+    list["tasks"] = list["tasks"].reject() do |task| task["done"] end
+    count = before - list["tasks"].length()
+    "cleared #{count} finished #{count == 1 ? "task" : "tasks"}"
+  end
+
+  # The tasks with the given ids (as typed on the command line), in order.
+  # Every id must exist, so a typo changes nothing.
+  def self.find_all(list: Hash, ids: Array) -> Array
+    raise UsageError.new("give at least one task id") if ids.empty?()
+    ids.map() do |text|
+      raise UsageError.new("not a task id: #{text}") unless Regexp.new("^[0-9]+$").match?(text)
+      id = text.to_i()
+      task = list["tasks"].find() do |candidate| candidate["id"] == id end
+      raise RuntimeError.new("no task #{id}") if task == nil
+      task
+    end
+  end
+
+  # --- entry point -----------------------------------------------------
+
+  # Runs one command and returns the exit status. env is ENV, passed in so
+  # the tests can point the list at a temporary file.
+  def self.main(args: Array, env: Hash = ENV) -> Int
+    begin
+      Tasks.run(args, env)
+    rescue error: UsageError
+      warn("tasks: #{error.message()}")
+      warn("run 'tasks --help' for usage")
+      64
+    rescue error: StandardError
+      warn("tasks: #{error.message()}")
+      1
+    end
+  end
+
+  def self.run(args: Array, env: Hash) -> Int
+    args = args.dup()
+    path = nil
+    if args.length() > 0 && (args[0] == "--file" || args[0] == "-f")
+      raise UsageError.new("--file needs a path") if args.length() < 2
+      path = args[1]
+      args = args.slice(2, args.length() - 2)
+    end
+    command = args.length() > 0 ? args[0] : "list"
+    rest = args.length() > 0 ? args.slice(1, args.length() - 1) : []
+
+    if command == "--help" || command == "-h" || command == "help"
+      puts(USAGE)
+      return 0
+    end
+
+    path = Tasks.default_path(env) if path == nil
+    list = Tasks.load(path)
+    today = Time.now().strftime("%Y-%m-%d")
+    changed = true
+    output = case command
+      when "add" then Tasks.add(list, rest, today)
+      when "done" then Tasks.set_done(list, rest, true)
+      when "undo" then Tasks.set_done(list, rest, false)
+      when "edit" then Tasks.edit(list, rest)
+      when "rm" then Tasks.remove(list, rest)
+      when "clear" then Tasks.clear(list)
+      when "list"
+        raise UsageError.new("list takes only --all") unless rest.empty?() || rest == ["--all"]
+        changed = false
+        Tasks.list_lines(list, rest == ["--all"])
+      else
+        raise UsageError.new("unknown command: #{command}")
+    end
+    Tasks.save(path, list) if changed
+    (output.is_a?(Array) ? output : [output]).each() do |line| puts(line) end
+    0
+  end
+end
