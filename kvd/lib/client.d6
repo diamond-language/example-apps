@@ -1,0 +1,67 @@
+# The client's side of the protocol described in lib/kvd.d6.
+class KvdClient
+  def initialize(host: String, port: Int)
+    @socket = TCPSocket.connect(host, port, {"connect_timeout_ms": 5000, "read_timeout_ms": 30000})
+  end
+
+  # Sends one request line and returns the reply's lines: one, or for a
+  # `*n` count, the count line followed by its n entries.
+  def request(line: String) -> Array
+    @socket.write("#{line}\n")
+    first = self.read_line()
+    return [first] unless first.start_with?("*")
+    count = first.slice(1, first.length() - 1).to_i()
+    [first] + (0...count).map() do self.read_line() end
+  end
+
+  def close() = @socket.close()
+
+  def read_line() -> String
+    line = @socket.gets()
+    raise IOError.new("kvd closed the connection") if line == nil
+    line
+  end
+
+  # How a reply reads on a terminal: values bare, nothing as "(nil)",
+  # errors on stderr.
+  def self.show(reply: Array) -> Bool
+    first = reply[0]
+    if first.start_with?("-")
+      warn(first.slice(1, first.length() - 1))
+      return false
+    end
+    if first.start_with?("*")
+      reply.slice(1, reply.length() - 1).each() do |line| puts(line.slice(1, line.length() - 1)) end
+    elsif first == "_"
+      puts("(nil)")
+    else
+      puts(first.slice(1, first.length() - 1))
+    end
+    true
+  end
+
+  def self.main(args: Array, host: String, port: Int) -> Int
+    client = nil
+    begin
+      client = KvdClient.new(host, port)
+    rescue error: IOError
+      warn("kvd-client: cannot reach #{host}:#{port}: #{error.message()}")
+      return 69
+    end
+    ok = true
+    begin
+      if args.length() > 0
+        ok = KvdClient.show(client.request(args.join(" ")))
+      else
+        line = gets()
+        while line != nil
+          ok = KvdClient.show(client.request(line)) && ok unless line.strip() == ""
+          line = gets()
+        end
+      end
+    ensure
+      client.close()
+    end
+    ok ? 0 : 1
+  end
+end

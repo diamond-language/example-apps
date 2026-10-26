@@ -1,0 +1,6 @@
+# The command-line entry point: hands ARGV to Tasks.main and exits with
+# the status it returns. The logic lives in lib/tasks.d6 so the tests
+# can call it directly.
+require "lib/tasks"
+
+exit(Tasks.main(ARGV))

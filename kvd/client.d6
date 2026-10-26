@@ -1,0 +1,15 @@
+# A client for kvd. With arguments it sends them as one request and prints
+# the reply; without, it sends each line of stdin. PORT and HOST work as
+# for the server.
+#
+#   diamond client.d6 SET greeting hello there
+#   diamond client.d6 GET greeting          # hello there
+#   printf 'INCR hits\nKEYS\n' | diamond client.d6
+#
+# Exits 1 if any reply was an error, 69 (EX_UNAVAILABLE) if the server
+# can't be reached.
+require "lib/client"
+
+port = ENV["PORT"] == nil ? 7000 : ENV["PORT"].to_i()
+host = ENV["HOST"] == nil ? "127.0.0.1" : ENV["HOST"]
+exit(KvdClient.main(ARGV, host, port))

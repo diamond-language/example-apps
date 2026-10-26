@@ -1,0 +1,92 @@
+# Run with `diamond test/tasks_test.d6`, or `bash test.sh` for every test file.
+require_cut "minitest"
+require "../lib/tasks"
+
+def run_tests()
+  # A scratch directory for the tests that save a list, removed at the end.
+  scratch = Process.run(["mktemp", "-d"]).stdout().strip()
+  env = {"TASKS_FILE": File.join(scratch, "nested/dir/tasks.json")}
+
+  def sample() -> Hash
+    list = Tasks.empty_list()
+    Tasks.add(list, ["buy", "milk"], "2026-10-26")
+    Tasks.add(list, ["call", "mom"], "2026-10-26")
+    list
+  end
+
+  def test_add_numbers_tasks_from_one()
+    list = sample()
+    Minitest.assert_equal([1, 2], list["tasks"].map() do |task| task["id"] end)
+    Minitest.assert_equal(3, list["next_id"])
+  end
+
+  def test_ids_are_not_reused()
+    list = sample()
+    Tasks.remove(list, ["2"])
+    Minitest.assert_equal("added 3: write tests", Tasks.add(list, ["write", "tests"], "2026-10-26"))
+  end
+
+  def test_list_hides_finished_tasks()
+    list = sample()
+    Tasks.set_done(list, ["1"], true)
+    Minitest.assert_equal(["2 [ ] call mom  (2026-10-26)"], Tasks.list_lines(list, false))
+    Minitest.assert_equal(2, Tasks.list_lines(list, true).length())
+  end
+
+  def test_ids_line_up()
+    list = Tasks.empty_list()
+    list["next_id"] = 9
+    Tasks.add(list, ["nine"], "2026-10-26")
+    Tasks.add(list, ["ten"], "2026-10-26")
+    Minitest.assert_equal([" 9 [ ] nine  (2026-10-26)", "10 [ ] ten  (2026-10-26)"], Tasks.list_lines(list, false))
+  end
+
+  def test_a_bad_id_changes_nothing()
+    list = sample()
+    def finish_with_a_bad_id() = Tasks.set_done(list, ["1", "7"], true)
+    Minitest.assert_raises[RuntimeError](finish_with_a_bad_id)
+    Minitest.assert_equal(false, list["tasks"][0]["done"])
+  end
+
+  def test_clear_removes_finished_tasks()
+    list = sample()
+    Tasks.set_done(list, ["2"], true)
+    Minitest.assert_equal("cleared 1 finished task", Tasks.clear(list))
+    Minitest.assert_equal(["buy milk"], list["tasks"].map() do |task| task["text"] end)
+  end
+
+  def test_default_path_follows_xdg()
+    Minitest.assert_equal("/data/tasks/tasks.json", Tasks.default_path({"XDG_DATA_HOME": "/data", "HOME": "/home/ada"}))
+    Minitest.assert_equal("/home/ada/.local/share/tasks/tasks.json", Tasks.default_path({"HOME": "/home/ada"}))
+  end
+
+  def test_main_saves_the_list()
+    Minitest.assert_equal(0, Tasks.main(["add", "water", "plants"], env))
+    Minitest.assert_equal(0, Tasks.main(["done", "1"], env))
+    saved = JSON.parse(File.read(env["TASKS_FILE"]))
+    Minitest.assert_equal("water plants", saved["tasks"][0]["text"])
+    Minitest.assert_equal(true, saved["tasks"][0]["done"])
+  end
+
+  def test_main_exit_statuses()
+    Minitest.assert_equal(0, Tasks.main(["--help"], env))
+    Minitest.assert_equal(64, Tasks.main(["frobnicate"], env))
+    Minitest.assert_equal(64, Tasks.main(["done", "x"], env))
+    Minitest.assert_equal(1, Tasks.main(["done", "99"], env))
+  end
+
+  suite = Minitest.new()
+  suite.test("add numbers tasks from 1", test_add_numbers_tasks_from_one)
+  suite.test("ids are never reused", test_ids_are_not_reused)
+  suite.test("list hides finished tasks unless --all", test_list_hides_finished_tasks)
+  suite.test("ids line up in the listing", test_ids_line_up)
+  suite.test("one bad id changes nothing", test_a_bad_id_changes_nothing)
+  suite.test("clear removes finished tasks", test_clear_removes_finished_tasks)
+  suite.test("the default path follows XDG_DATA_HOME", test_default_path_follows_xdg)
+  suite.test("main saves the list, creating its directory", test_main_saves_the_list)
+  suite.test("main's exit statuses", test_main_exit_statuses)
+  passed = suite.run()
+  Process.run(["rm", "-rf", scratch])
+  exit(passed ? 0 : 1)
+end
+run_tests()
