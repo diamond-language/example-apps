@@ -64,7 +64,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y gcc make git ca-certificates diffutils findutils \
-            libssl-dev libsqlite3-dev libpq-dev zlib1g-dev libmariadb-dev libcrypt-dev
+            libssl-dev libsqlite3-dev libpq-dev zlib1g-dev libmariadb-dev libcrypt-dev curl gzip
       - uses: actions/checkout@v7
         with:
           path: example-apps
