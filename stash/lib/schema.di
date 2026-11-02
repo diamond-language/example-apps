@@ -1,15 +1,15 @@
 # Every table as a Mjolnir schema over a plain struct. Entities come back frozen.
 struct User(id: Int, email: String, username: String, password_digest: String)
 end
-def build_user(row) = User.new(row["id"], row["email"], row["username"], row["password_digest"])
+def build_user(row: Hash) -> User = User.new(row["id"], row["email"], row["username"], row["password_digest"])
 
 struct Session(id: Int, user_id: Int, token: String, csrf_token: String, expires_at: Int)
 end
-def build_session(row) = Session.new(row["id"], row["user_id"], row["token"], row["csrf_token"], row["expires_at"])
+def build_session(row: Hash) -> Session = Session.new(row["id"], row["user_id"], row["token"], row["csrf_token"], row["expires_at"])
 
 struct Bookmark(id: Int, user_id: Int, url: String, title: String, note: String | Nil, tags: String, created_at: Int, updated_at: Int)
 end
-def build_bookmark(row) = Bookmark.new(row["id"], row["user_id"], row["url"], row["title"], row["note"], row["tags"], row["created_at"], row["updated_at"])
+def build_bookmark(row: Hash) -> Bookmark = Bookmark.new(row["id"], row["user_id"], row["url"], row["title"], row["note"], row["tags"], row["created_at"], row["updated_at"])
 
 class Schemas
   def initialize()
