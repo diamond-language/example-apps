@@ -26,8 +26,8 @@ diamond app.di                             # prints its address; creates data/st
 
 ## Test
 
-`python3 test/app_test.py [path/to/diamond]` (or set `DIAMOND_BIN`) starts a throwaway server and checks signup, login,
-CSRF, CRUD, tags, search, paging and that one user cannot touch another's bookmarks.
+`bash test.sh` (set `DIAMOND_BIN` to use another `diamond`) compiles the views, starts a throwaway server and checks
+signup, login, CSRF, CRUD, tags, search, paging and that one user cannot touch another's bookmarks.
 
 ## Notes
 
