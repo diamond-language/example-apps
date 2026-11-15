@@ -1,4 +1,4 @@
-# Diamond example apps
+# d6 example apps
 
 Small, complete applications written in [d6](https://github.com/diamond-language/d6), each in its
 own directory with its own README, cuts (`diamond.cut`, installed with `facet install`) and tests.
@@ -9,11 +9,11 @@ own directory with its own README, cuts (`diamond.cut`, installed with `facet in
 | [`tasks`](tasks) | A to-do list for the terminal: subcommands, exit statuses, a JSON file saved atomically, XDG paths |
 | [`kvd`](kvd) | A key-value server and client over a line protocol: one-thread `IO.poll` serving, write-through persistence, signal handling |
 
-Skindicate, Diamond's production app, lives in its own repository and is not an example.
+Skindicate, d6's production app, lives in its own repository and is not an example.
 
 ## Running an app
 
-Install Diamond (and `facet`) from the main repository, then in an app's directory:
+Install d6 (and `facet`) from the main repository, then in an app's directory:
 
 ```sh
 facet install

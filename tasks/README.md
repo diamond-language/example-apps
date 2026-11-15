@@ -1,6 +1,6 @@
 # tasks
 
-A to-do list for the terminal, written in [Diamond](https://getdiamond.codes). It
+A to-do list for the terminal, written in [d6](https://rolld6.codes). It
 started as `facet new cli tasks`.
 
 ```sh

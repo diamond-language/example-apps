@@ -1,6 +1,6 @@
 # kvd
 
-A small key-value server and its client, written in [Diamond](https://getdiamond.codes).
+A small key-value server and its client, written in [d6](https://rolld6.codes).
 It started as `facet new tcp kvd`. One thread serves every client with `IO.poll`.
 
 ```sh
