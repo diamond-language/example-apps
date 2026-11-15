@@ -1,6 +1,6 @@
 # Diamond example apps
 
-Small, complete applications written in [Diamond](https://github.com/diamond-language/diamond), each in its
+Small, complete applications written in [d6](https://github.com/diamond-language/d6), each in its
 own directory with its own README, cuts (`diamond.cut`, installed with `facet install`) and tests.
 
 | App | What it shows |
