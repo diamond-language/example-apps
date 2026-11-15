@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 1
       - uses: actions/checkout@v7
         with:
-          repository: diamond-language/diamond
+          repository: diamond-language/d6
           path: diamond
           fetch-depth: 1
       - name: Build Diamond and facet
