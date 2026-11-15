@@ -1,6 +1,6 @@
 # Stash
 
-A private bookmark shelf written in Diamond: save a link, tag it, search it.
+A private bookmark shelf written in d6: save a link, tag it, search it.
 Built on Gremlin (server), Div (views) and Mjolnir (data), with the same shape as
 Skindicate: a `Conn` flows through guards to a handler; operations return
 `Ok`/`Err`; views are pure functions of data.
@@ -34,4 +34,4 @@ signup, login, CSRF, CRUD, tags, search, paging and that one user cannot touch a
 - Tags live in one column as `" a b c "` (a space each side), so a tag filter is `LIKE '% tag %'`.
   That is exact and simple at personal scale; a join table is the move if tags need renaming or stats.
 - A multi-worker server (`STASH_THREADS`) runs no top-level statements in a worker, so shared values are
-  functions (`lib/util.di`), as in other multi-worker Diamond servers.
+  functions (`lib/util.di`), as in other multi-worker d6 servers.
